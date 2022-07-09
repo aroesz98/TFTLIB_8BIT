@@ -3,7 +3,7 @@ LCD 8-bit Parallel Interface Library for STM32
 
 At first create CubeMX project. Configure 4 pins (RD, WR, RS(DC), CS) and 1 GPIO port (i.e. PB0-PB7) for display.
 
-Then make project and copy library .c/.cpp files to "Src" folder and header files to "Inc" folder. Convert project to C++ and rename main.c to main.cpp
+Then make project and copy library project folder. Add library path to "Include paths" in GCC and G++ compiler options. Convert project to C++ and rename main.c to main.cpp
 
 Simply create TFTLIB_SPI object by calling:
 
