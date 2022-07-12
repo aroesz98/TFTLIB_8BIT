@@ -57,7 +57,19 @@ enum COLORS{
 	NAVY		= 0x000F,
 	MAROON		= 0x7800,
 	OLIVE		= 0x7BE0,
-	GREENYELLOW	= 0xB7E0
+	GREENYELLOW	= 0xB7E0,
+
+	DKBLUE		= 0x000D,
+	DKTEAL		= 0x020C,
+	DKGREEN		= 0x03E0,
+	DKCYAN		= 0x03EF,
+	DKRED		= 0x6000,
+	DKMAGENTA	= 0x8008,
+	DKYELLOW	= 0x8400,
+	DKORANGE 	= 0x8200,
+	DKPINK		= 0x9009,
+	DKPURPLE	= 0x4010,
+	DKGREY		= 0x4A49,
 };
 
 enum DATUM {
@@ -139,7 +151,7 @@ enum LCD_DRIVER {
 	NT35510_PARALLEL	= 0x04,
 };
 
-class TFTLIB_8BIT : public Print {
+class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 	private:
 		uint8_t _rotation;
 		int32_t _tx0, _tx1, _ty0, _ty1;
@@ -201,8 +213,8 @@ class TFTLIB_8BIT : public Print {
 		void RD_H(void) {  RD_PORT->BSRR = RD_PIN; }
 
 		void WR_STROBE(void) { WR_L(); WR_H(); }
-		void RD_STROBE(void) { RD_L(); RD_L(); RD_L(); RD_L(); RD_L(); RD_L(); }
-		void RD_IDLE(void)	 { RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); RD_H(); }
+		void RD_STROBE(void) { RD_L(); asm("NOP"); asm("NOP"); asm("NOP"); }
+		void RD_IDLE(void)	 { RD_H(); asm("NOP"); }
 
 	public:
 		TFTLIB_8BIT(GPIO_TypeDef *parallel_bus, uint8_t drv, GPIO_TypeDef *GPIO_RD_PORT, uint16_t GPIO_RD_PIN, GPIO_TypeDef *GPIO_WR_PORT, uint16_t GPIO_WR_PIN, GPIO_TypeDef *GPIO_DC_PORT, uint16_t GPIO_DC_PIN, GPIO_TypeDef *GPIO_CS_PORT, uint16_t GPIO_CS_PIN);
@@ -215,37 +227,32 @@ class TFTLIB_8BIT : public Print {
 
 		void writeCommand8 (uint8_t);
 		void writeCommand16 (uint16_t);
-
 		void writeData8(uint8_t *data, uint32_t len);
 		void writeData16(uint16_t *data, uint32_t len);
-
 		inline void writeSmallData8 (uint8_t);
 		inline void writeSmallData16 (uint16_t);
 		inline void writeSmallData32 (uint32_t);
 
 		void setWindow8(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 		void readWindow8(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
-
 		void pushPixels16(const void* data_in, uint32_t len);
 		void pushBlock16(uint16_t color, uint32_t len);
 
-		void setRotation(uint8_t m);
-		uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
-		uint16_t color16to8(uint16_t c);
-		uint16_t color8to16(uint8_t color);
-		uint16_t alphaBlend(uint8_t alpha, uint16_t fgc, uint16_t bgc);
-
-		uint16_t readID(void);
 		void init(void);
-
-		void ARTtoggle();
+		void setRotation(uint8_t m);
+		uint16_t readID(void);
 		uint16_t width(void);
 		uint16_t height(void);
+
 		void fillScreen(uint16_t color);
 
-		uint16_t readPixel(int32_t x0, int32_t y0);
-		void drawPixel(int32_t x, int32_t y, uint16_t color);
-		void drawPixelAlpha(int16_t x, int16_t y, uint16_t color, float alpha);
+		uint16_t	readPixel(int32_t x0, int32_t y0);
+		void		drawPixel(int32_t x, int32_t y, uint16_t color);
+		uint16_t	drawPixel(int32_t x, int32_t y, uint32_t color, uint8_t alpha, uint32_t bg_color);
+		void		drawPixelAlpha(int16_t x, int16_t y, uint16_t color, float alpha);
+		void		drawSpot(float ax, float ay, float r, uint32_t color);
+		void		fillSmoothCircle(int32_t x, int32_t y, int32_t r, uint32_t color, uint32_t bg_color = 0x00FFFFFF);
+		void		fillSmoothRoundRect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t radius, uint32_t color, uint32_t bg_color = 0x00FFFFFF);
 
 		inline float wedgeLineDistance(float xpax, float ypay, float bax, float bay, float dr);
 		inline void drawCircleHelper( int32_t x0, int32_t y0, int32_t rr, uint8_t cornername, uint16_t color);
@@ -259,10 +266,8 @@ class TFTLIB_8BIT : public Print {
 		void drawVLineAlpha(int32_t x, int32_t y, int32_t h, uint16_t color, uint8_t alpha);
 		void drawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint16_t color);
 
-		void drawWideLine(float ax, float ay, float bx, float by, float wd, uint16_t fg_color);
-		void drawWideLine(float ax, float ay, float bx, float by, float wd, uint16_t fg_color, uint16_t bg_color);
-		void drawWedgeLine(float ax, float ay, float bx, float by, float aw, float bw, uint16_t fg_color);
-		void drawWedgeLine(float ax, float ay, float bx, float by, float aw, float bw, uint16_t fg_color, uint16_t bg_color);
+		void drawWideLine(float ax, float ay, float bx, float by, float wd, uint16_t fg_color, uint16_t bg_color = 0xFFFF);
+		void drawWedgeLine(float ax, float ay, float bx, float by, float ar, float br, uint32_t fg_color, uint32_t bg_color = 0x00FFFFFF);
 
 		void drawTriangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, uint16_t color);
 		void drawTriangleAA(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, int32_t thickness, uint16_t color);
@@ -277,30 +282,27 @@ class TFTLIB_8BIT : public Print {
 		void drawEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color);
 
 		/* Text functions. */
-		void setCursor(int16_t x, int16_t y);
-		void setCursor(int16_t x, int16_t y, uint8_t font);
-		int16_t getCursorX(void);
-		int16_t getCursorY(void);
+		uint8_t getTextDatum(void);
+		void getCursor(int16_t* x, int16_t* y);
+		uint16_t getTextPadding(void);
 
+		void setCursor(int16_t x, int16_t y);
 		void setTextColor(uint16_t c);
 		void setTextColor(uint16_t c, uint16_t b);
-
+		void setTextWrap(bool wrapX, bool wrapY = false);
 		void setTextSize(uint8_t s);
 		void setFreeFont(const GFXfont *f);
-
 		void setTextDatum(uint8_t d);
-		uint8_t getTextDatum(void);
-
 		void setTextPadding(uint16_t x_width);
-		uint16_t getTextPadding(void);
 
 		size_t write(uint8_t utf8);
 		int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y);
 		void drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size);
 
+		int16_t drawString(const char *string, int32_t poX, int32_t poY);
 		int16_t drawCentreString(const char *string, int32_t dX, int32_t poY);
 		int16_t drawRightString(const char *string, int32_t dX, int32_t poY);
-		int16_t drawString(const char *string, int32_t poX, int32_t poY);
+
 		int16_t drawNumber(long long_num, int32_t poX, int32_t poY);
 		int16_t drawFloat(float floatNumber, uint8_t dp, int32_t poX, int32_t poY);
 
@@ -324,9 +326,16 @@ class TFTLIB_8BIT : public Print {
 		void fillEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color);
 
 		void drawImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *data);
+		void drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *bitmap, uint16_t color);
 		void drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *bitmap, uint16_t color);
-		void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color);
-		void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t fgcolor, uint16_t bgcolor);
+		void drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *bitmap, uint16_t fgcolor, uint16_t bgcolor);
+        void drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t fgcolor);
+        void drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t fgcolor, uint16_t bgcolor);
+
+		uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
+		uint16_t color16to8(uint16_t c);
+		uint16_t color8to16(uint8_t color);
+		uint16_t alphaBlend(uint8_t alpha, uint16_t fgc, uint16_t bgc);
 
 		uint32_t testFillScreen();
 		uint32_t testText();

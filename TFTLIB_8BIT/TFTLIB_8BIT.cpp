@@ -55,15 +55,40 @@ uint16_t TFTLIB_8BIT::height(void){
 }
 
 uint16_t TFTLIB_8BIT::readID(void) {
-	writeCommand8(0xD3);
+	uint8_t data1, data2;
+	uint16_t id;
 
-	PIN_INPUT(GPIOB, 0x00FF);
+	switch(_type) {
+		case NT35510_PARALLEL:
+			writeCommand16(0xDB00);
+			PIN_INPUT(GPIOB, 0x00FF);
+			readByte();
+			data1 = readByte();
+			PIN_OUTPUT(GPIOB, 0x00FF);
 
-	readByte();
-	readByte();
-	uint16_t id = readByte() << 8 | readByte();
+			writeCommand16(0xDC00);
+			PIN_INPUT(GPIOB, 0x00FF);
+			readByte();
+			data2 = readByte();
+			PIN_OUTPUT(GPIOB, 0x00FF);
 
-	PIN_OUTPUT(GPIOB, 0x00FF);
+			id = data1 << 8 | data2;
+		break;
+
+		default:
+			writeCommand8(0xD3);
+
+			PIN_INPUT(GPIOB, 0x00FF);
+
+			readByte();
+			readByte();
+			data1 = readByte();
+			data2 = readByte();
+			PIN_OUTPUT(GPIOB, 0x00FF);
+
+			id = data1 << 8 | data2;
+		break;
+	}
 
 	return id;
 }
@@ -123,6 +148,7 @@ uint8_t TFTLIB_8BIT::readByte(void)
 
 	DC_H();
 	CS_L();
+
 	RD_STROBE();
 
 	b = (_PARALLEL_PORT->IDR & 0x00FF);
@@ -520,13 +546,112 @@ void TFTLIB_8BIT::readWindow8(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1
 {
 	if ((x0 > x1) || (x1 > _width) || (y0 > y1) || (y1 > _height)) return;
 
-	writeCommand8(CASET);
-	writeSmallData32(((uint32_t) x0 << 16) | x1);
+	CS_L();
 
-	writeCommand8(RASET);
-	writeSmallData32(((uint32_t) y0 << 16) | y1);
+	switch(_type) {
+		case NT35510_PARALLEL:
+			if(_tx0 != x0 || _tx1 != x1) {
+				CS_L();
+				DC_L();
+				write16(0x2A00);
+				DC_H();
+				write8(0x00);
+				write8(Byte8H(x0));
 
-	writeCommand8(RAMRD);
+				DC_L();
+				write16(0x2A01);
+				DC_H();
+				write8(0x00);
+				write8(Byte8L(x0));
+
+				DC_L();
+				write16(0x2A02);
+				DC_H();
+				write8(0x00);
+				write8(Byte8H(x1));
+
+				DC_L();
+				write16(0x2A03);
+				DC_H();
+				write8(0x00);
+				write8(Byte8L(x1));
+				_tx0 = x0;
+				_tx1 = x1;
+			}
+
+			if(_ty0 != y0 || _ty1 != y1) {
+				DC_L();
+				write16(0x2B00);
+				DC_H();
+				write8(0x00);
+				write8(Byte8H(y0));
+
+				DC_L();
+				write16(0x2B01);
+				DC_H();
+				write8(0x00);
+				write8(Byte8L(y0));
+
+				DC_L();
+				write16(0x2B02);
+				DC_H();
+				write8(0x00);
+				write8(Byte8H(y1));
+
+				DC_L();
+				write16(0x2B03);
+				DC_H();
+				write8(0x00);
+				write8(Byte8L(y1));
+				_ty0 = y0;
+				_ty1 = y1;
+			}
+
+			DC_L();
+			write16(0x2E00);
+			DC_H();
+			CS_H();
+		break;
+
+		case ILI9327_PARALLEL:
+		    if (_rotation == 2) y0 += 32, y1 += 32;
+		    if (_rotation == 3) x0 += 32, x1 += 32;
+
+			if (_tx0 != x0 || _tx1 != x1) {
+				writeCommand8(CASET);
+				writeSmallData32(((uint32_t) x0 << 16) | x1);
+				_tx0 = x0;
+				_tx1 = x1;
+			}
+
+			if (_ty0 != y0 || _ty1 != y1) {
+				writeCommand8(RASET);
+				writeSmallData32(((uint32_t) y0 << 16) | y1);
+				_ty0 = y0;
+				_ty1 = y1;
+			}
+
+			writeCommand8(RAMRD);
+		break;
+
+		case ILI9341_PARALLEL:
+			if (_tx0 != x0 || _tx1 != x1) {
+				writeCommand8(CASET);
+				writeSmallData32(((uint32_t) x0 << 16) | x1);
+				_tx0 = x0;
+				_tx1 = x1;
+			}
+
+			if (_ty0 != y0 || _ty1 != y1) {
+				writeCommand8(RASET);
+				writeSmallData32(((uint32_t) y0 << 16) | y1);
+				_ty0 = y0;
+				_ty1 = y1;
+			}
+
+			writeCommand8(RAMRD);
+		break;
+	}
 }
 
 /***************************************************************************************
@@ -615,49 +740,12 @@ int TFTLIB_8BIT::FreeRAM() {
 }
 
 /***************************************************************************************
-** Function name:           Toggle ART Accelerator
-** Description:             Turn on / Turn off ART Accelerator
-***************************************************************************************/
-void TFTLIB_8BIT::ARTtoggle() {
-	setTextColor(RED);
-	setTextSize(1);
-	setCursor(0, 0);
-	if((FLASH->ACR & FLASH_ACR_ICEN)!=FLASH_ACR_ICEN) { // art disabled
-		/* enable the ART accelerator */
-		/* enable prefetch buffer */
-		FLASH->ACR |= FLASH_ACR_PRFTEN;
-		/* Enable flash instruction cache */
-		FLASH->ACR |= FLASH_ACR_ICEN;
-		/* Enable flash data cache */
-		FLASH->ACR |= FLASH_ACR_DCEN;
-		asm("wfi"); //wait for a systick interrupt
-		fillScreen(BLACK);
-		setCursor(0, 0);
-		println((char*)"ART enabled");
-	}
-
-	else {
-		/* disable the ART accelerator */
-		/* disable flash instruction cache */
-		FLASH->ACR &= ~FLASH_ACR_ICEN;
-		/* disable flash data cache */
-		FLASH->ACR &= ~FLASH_ACR_DCEN;
-		/* enable prefetch buffer */
-		FLASH->ACR &= ~FLASH_ACR_PRFTEN;
-		asm("wfi"); //wait for a systick interrupt
-		fillScreen(BLACK);
-		setCursor(0, 0);
-		println((char*)"ART disabled");
-	}
-}
-
-/***************************************************************************************
 ** Function name:           readPixel (PARALLEL DISPLAY ONLY!)
 ** Description:             Read single pixel at coords x&y
 ***************************************************************************************/
 uint16_t TFTLIB_8BIT::readPixel(int32_t x0, int32_t y0)
 {
-	uint8_t data[4];
+	uint8_t data[3];
 
 	readWindow8(x0, y0, x0, y0);
 
@@ -665,14 +753,14 @@ uint16_t TFTLIB_8BIT::readPixel(int32_t x0, int32_t y0)
 	PIN_INPUT(_PARALLEL_PORT, 0x00FF);
 
 	readByte();
+	data[0] = readByte();
 	data[1] = readByte();
 	data[2] = readByte();
-	data[3] = readByte();
 
 	// Set masked pins D0- D7 to output
 	PIN_OUTPUT(_PARALLEL_PORT, 0x00FF);
 
-	return (((data[1] & 0xF8) << 8) | ((data[2] & 0xFC) << 3) | (data[3]  >> 3));
+	return (((data[0] & 0xF8) << 8) | ((data[1] & 0xFC) << 3) | (data[2]  >> 3));
 }
 
 /***************************************************************************************
@@ -688,20 +776,35 @@ void TFTLIB_8BIT::drawPixel(int32_t x, int32_t y, uint16_t color)
 }
 
 /***************************************************************************************
-** Function name:           drawPixelAlpha (PARALLEL DISPLAY ONLY!)
+** Function name:           drawPixel (alpha blended)
+** Description:             Draw a pixel blended with the screen or bg pixel colour
+***************************************************************************************/
+uint16_t TFTLIB_8BIT::drawPixel(int32_t x, int32_t y, uint32_t color, uint8_t alpha, uint32_t bg_color)
+{
+	if (bg_color == 0x00FFFFFF) bg_color = readPixel(x, y);
+	color = alphaBlend(alpha, color, bg_color);
+	drawPixel(x, y, color);
+	return color;
+}
+
+/***************************************************************************************
+** Function name:           drawPixelAlpha
 ** Description:             Draw single pixel with alpha channel
 ***************************************************************************************/
 void TFTLIB_8BIT::drawPixelAlpha(int16_t x, int16_t y, uint16_t color, float alpha) {
 	if ((x < 0) || (x >= _width) || (y < 0) || (y >= _height))	return;
 
-	if (alpha > 0.996) {
-		drawPixel(x, y, color);
-	}
+	uint16_t px = readPixel(x, y);
+	drawPixel(x, y, alphaBlend((uint8_t)alpha, color, px));
+}
 
-	alpha = alpha * PixelAlphaGain;
-	if (alpha > 255) alpha = 255;
-
-	drawPixel(x, y, alphaBlend((uint8_t)alpha, color, readPixel(x, y)));
+/***************************************************************************************
+** Function name:           drawSpot - maths intensive, so for small filled circles
+** Description:             Draw an anti-aliased filled circle at ax,ay with radius r
+***************************************************************************************/
+void TFTLIB_8BIT::drawSpot(float ax, float ay, float r, uint32_t color) {
+	// Filled circle can be created by the wide line function with zero line length
+	drawWedgeLine( ax, ay, ax, ay, r, r, color, 0x00FFFFFF);
 }
 
 /***************************************************************************************
@@ -833,7 +936,7 @@ inline void TFTLIB_8BIT::drawCircleHelper( int32_t x0, int32_t y0, int32_t rr, u
 				drawFastHLine(x0 - xe, y0 + rr, len, color);
 			}
 		}
-	xs = xe;
+		xs = xe;
 	}
 }
 
@@ -998,14 +1101,6 @@ void TFTLIB_8BIT::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint1
 ** Function name:           drawWideLine
 ** Description:             Draw anti-aliased line with single color
 ***************************************************************************************/
-void TFTLIB_8BIT::drawWideLine(float ax, float ay, float bx, float by, float wd, uint16_t fg_color) {
-	drawWedgeLine( ax, ay, bx, by, wd/2.0, wd/2.0, fg_color, 0xFFFF);
-}
-
-/***************************************************************************************
-** Function name:           drawWideLine
-** Description:             Draw anti-aliased line with single color
-***************************************************************************************/
 void TFTLIB_8BIT::drawWideLine(float ax, float ay, float bx, float by, float wd, uint16_t fg_color, uint16_t bg_color) {
 	drawWedgeLine( ax, ay, bx, by, wd/2.0, wd/2.0, fg_color, bg_color);
 }
@@ -1014,15 +1109,8 @@ void TFTLIB_8BIT::drawWideLine(float ax, float ay, float bx, float by, float wd,
 ** Function name:           drawWedgeLine
 ** Description:             Draw anti-aliased line with single color
 ***************************************************************************************/
-void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar, float br, uint16_t fg_color) {
-	drawWedgeLine(ax, ay, bx, by, ar, br, fg_color, 0xFFFF);
-}
-
-/***************************************************************************************
-** Function name:           drawWedgeLine
-** Description:             Draw anti-aliased line with single color
-***************************************************************************************/
-void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar, float br, uint16_t fg_color, uint16_t bg_color = 0xFFFF) {
+void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar, float br, uint32_t fg_color, uint32_t bg_color)
+{
 	if ( (abs(ax - bx) < 0.01f) && (abs(ay - by) < 0.01f) ) bx += 0.01f;  // Avoid divide by zero
 
 	// Find line bounding box
@@ -1039,6 +1127,7 @@ void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar
 	float alpha = 1.0f;
 	ar += 0.5;
 
+	uint16_t bg = bg_color;
 	float xpax, ypay, bax = bx - ax, bay = by - ay;
 
 	int32_t xs = x0;
@@ -1053,24 +1142,19 @@ void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar
 			alpha = ar - wedgeLineDistance(xpax, ypay, bax, bay, rdt);
 			if (alpha <= LoAlphaTheshold ) continue;
 			// Track edge to minimise calculations
-			if (!endX) {
-				endX = true;
-				xs = xp;
-			}
-
+			if (!endX) { endX = true; xs = xp; }
 			if (alpha > HiAlphaTheshold) {
 				if (swin) {
 					setWindow8(xp, yp, width()-1, yp);
 					swin = false;
 				}
+
 				pushBlock16(fg_color);
 				continue;
 			}
-
 			//Blend color with background and plot
-			if(bg_color == 0xFFFF) {
-				bg_color = readPixel(xp, yp);
-				swin = true;
+			if (bg_color == 0x00FFFFFF) {
+				bg = readPixel(xp, yp); swin = true;
 			}
 
 			if (swin) {
@@ -1078,7 +1162,7 @@ void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar
 				swin = false;
 			}
 
-			pushBlock16(alphaBlend((uint8_t)(alpha * PixelAlphaGain), fg_color, bg_color));
+			pushBlock16(alphaBlend((uint8_t)(alpha * PixelAlphaGain), fg_color, bg));
 		}
 	}
 
@@ -1094,35 +1178,120 @@ void TFTLIB_8BIT::drawWedgeLine(float ax, float ay, float bx, float by, float ar
 			xpax = xp - ax;
 			alpha = ar - wedgeLineDistance(xpax, ypay, bax, bay, rdt);
 			if (alpha <= LoAlphaTheshold ) continue;
-
 			// Track line boundary
-			if (!endX) {
-				endX = true;
-				xs = xp;
-			}
-
+			if (!endX) { endX = true; xs = xp; }
 			if (alpha > HiAlphaTheshold) {
-				if (swin) {
-					setWindow8(xp, yp, width()-1, yp);
-					swin = false;
-				}
+				if (swin) { setWindow8(xp, yp, width()-1, yp); swin = false; }
 				pushBlock16(fg_color);
 				continue;
 			}
-
 			//Blend color with background and plot
-			if(bg_color == 0xFFFF) {
-				bg_color = readPixel(xp, yp);
-				swin = true;
+			if (bg_color == 0x00FFFFFF) {
+			bg = readPixel(xp, yp); swin = true;
 			}
-
-			if (swin) {
-				setWindow8(xp, yp, width()-1, yp);
-				swin = false;
-			}
-
-			pushBlock16(alphaBlend((uint8_t)(alpha * PixelAlphaGain), fg_color, bg_color));
+			if (swin) { setWindow8(xp, yp, width()-1, yp); swin = false; }
+			pushBlock16(alphaBlend((uint8_t)(alpha * PixelAlphaGain), fg_color, bg));
 		}
+	}
+}
+
+/***************************************************************************************
+** Function name:           fillSmoothCircle
+** Description:             Draw a filled anti-aliased circle
+***************************************************************************************/
+void TFTLIB_8BIT::fillSmoothCircle(int32_t x, int32_t y, int32_t r, uint32_t color, uint32_t bg_color)
+{
+	if (r <= 0) return;
+
+	drawFastHLine(x - r, y, 2 * r + 1, color);
+	int32_t xs = 1;
+	int32_t cx = 0;
+
+	int32_t r1 = r * r;
+	r++;
+	int32_t r2 = r * r;
+
+	for (int32_t cy = r - 1; cy > 0; cy--) {
+		int32_t dy2 = (r - cy) * (r - cy);
+		for (cx = xs; cx < r; cx++) {
+			int32_t hyp2 = (r - cx) * (r - cx) + dy2;
+			if (hyp2 <= r1) break;
+			if (hyp2 >= r2) continue;
+			float alphaf = (float)r - sqrtf(hyp2);
+			if (alphaf > HiAlphaTheshold) break;
+			xs = cx;
+			if (alphaf < LoAlphaTheshold) continue;
+			uint8_t alpha = alphaf * 255;
+
+			if (bg_color == 0x00FFFFFF) {
+				drawPixel(x + cx - r, y + cy - r, color, alpha, bg_color);
+				drawPixel(x - cx + r, y + cy - r, color, alpha, bg_color);
+				drawPixel(x - cx + r, y - cy + r, color, alpha, bg_color);
+				drawPixel(x + cx - r, y - cy + r, color, alpha, bg_color);
+			}
+
+			else {
+				uint16_t pcol = drawPixel(x + cx - r, y + cy - r, color, alpha, bg_color);
+				drawPixel(x - cx + r, y + cy - r, pcol);
+				drawPixel(x - cx + r, y - cy + r, pcol);
+				drawPixel(x + cx - r, y - cy + r, pcol);
+			}
+		}
+		drawFastHLine(x + cx - r, y + cy - r, 2 * (r - cx) + 1, color);
+		drawFastHLine(x + cx - r, y - cy + r, 2 * (r - cx) + 1, color);
+	}
+}
+
+
+/***************************************************************************************
+** Function name:           fillSmoothRoundRect
+** Description:             Draw a filled anti-aliased rounded corner rectangle
+***************************************************************************************/
+void TFTLIB_8BIT::fillSmoothRoundRect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint32_t color, uint32_t bg_color)
+{
+	int32_t xs = 0;
+	int32_t cx = 0;
+
+	// Limit radius to half width or height
+	if (r > w/2) r = w/2;
+	if (r > h/2) r = h/2;
+
+	y += r;
+	h -= 2*r;
+
+	fillRect(x, y, w, h, color);
+
+	h--;
+	x += r;
+	w -= 2*r+1;
+	int32_t r1 = r * r;
+
+	r++;
+	int32_t r2 = r * r;
+
+	for (int32_t cy = r - 1; cy > 0; cy--) {
+		int32_t dy2 = (r - cy) * (r - cy);
+		for (cx = xs; cx < r; cx++) {
+			int32_t hyp2 = (r - cx) * (r - cx) + dy2;
+
+			if (hyp2 <= r1) break;
+			if (hyp2 >= r2) continue;
+
+			float alphaf = (float)r - sqrtf(hyp2);
+			if (alphaf > HiAlphaTheshold) break;
+			xs = cx;
+
+			if (alphaf < LoAlphaTheshold) continue;
+			uint8_t alpha = alphaf * 255;
+
+			drawPixel(x + cx - r, y + cy - r, color, alpha, bg_color);
+			drawPixel(x - cx + r + w, y + cy - r, color, alpha, bg_color);
+			drawPixel(x - cx + r + w, y - cy + r + h, color, alpha, bg_color);
+			drawPixel(x + cx - r, y - cy + r + h, color, alpha, bg_color);
+		}
+
+		drawFastHLine(x + cx - r, y + cy - r, 2 * (r - cx) + 1 + w, color);
+		drawFastHLine(x + cx - r, y - cy + r + h, 2 * (r - cx) + 1 + w, color);
 	}
 }
 
@@ -1520,7 +1689,7 @@ void TFTLIB_8BIT::fillRectAA(int32_t x, int32_t y, int32_t w, int32_t h, uint16_
 	pushBlock16(color, w * h);
 
 	drawWideLine(x, y, x + w - 1, y, 1, color);
-	drawWideLine(x, y+h-1, x+w-1, y+h-1, 1, color);
+	drawWideLine(x, y + h - 1, x + w - 1, y + h - 1, 1, color);
 
 	drawWideLine(x, y, x, y + h - 1, 1, color);
 	drawWideLine(x + w, y, x + w, y + h - 1, 1, color);
@@ -1534,16 +1703,17 @@ void TFTLIB_8BIT::fillRectAlpha(int32_t x, int32_t y, int32_t w, int32_t h, uint
 {
 	if(x < 0 || y < 0 || w < 0 || h < 0 || x > _width || y > _height || x + w > _width || y + h > _height) return;
 
-	uint16_t i = 0;
-	while(i++ < h) {
-		uint16_t j = 0;
+	for(uint16_t j = 0; j < h; j++) {
 
-		while(j < w) {
-			_buffer[j] = alphaBlend(alpha, color, readPixel(x + j, y + i));
-			j++;
+		for(uint16_t i = 0; i < w; i++) {
+			_buffer[i] = readPixel(x + i, y + j);
 		}
 
-		setWindow8(x, y + i, x + w, y + i);
+		for(uint16_t i = 0; i < w; i++) {
+			_buffer[i] = alphaBlend(alpha, color, _buffer[i]);
+		}
+
+		setWindow8(x, y + j, x + w - 1, y + j);
 		writeData16(_buffer, w);
 	}
 }
@@ -1701,7 +1871,7 @@ void TFTLIB_8BIT::drawImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t
 ** Function name:           drawBitmap
 ** Description:             Draw bitmap from array with fixed color
 ***************************************************************************************/
-void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *bitmap, uint16_t color) {
+void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *bitmap, uint16_t color) {
 	if(x < 0 || y < 0 || w < 0 || h < 0 || x > _width || y > _height || x + w > _width || y + h > _height) return;
 
 	int32_t i, j, byteWidth = (w + 7) / 8;
@@ -1719,7 +1889,9 @@ void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const u
 ** Function name:           drawBitmap
 ** Description:             Draw an image stored in an array on the TFT
 ***************************************************************************************/
-void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color) {
+void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *bitmap, uint16_t color) {
+	if(x < 0 || y < 0 || w < 0 || h < 0 || x > _width || y > _height || x + w > _width || y + h > _height) return;
+
 	int32_t i, j, byteWidth = (w + 7) / 8;
 
 	for (j = 0; j < h; j++) {
@@ -1736,13 +1908,50 @@ void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_
 ** Function name:           drawBitmap
 ** Description:             Draw an image stored in an array on the TFT
 ***************************************************************************************/
-void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t fgcolor, uint16_t bgcolor)
+void TFTLIB_8BIT::drawBitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *bitmap, uint16_t fgcolor, uint16_t bgcolor)
 {
+	if(x < 0 || y < 0 || w < 0 || h < 0 || x > _width || y > _height || x + w > _width || y + h > _height) return;
+
 	int32_t i, j, byteWidth = (w + 7) / 8;
 
 	for (j = 0; j < h; j++) {
 		for (i = 0; i < w; i++ ) {
 			if (read_byte(bitmap + j * byteWidth + i / 8) & (128 >> (i & 7)))  drawPixel(x + i, y + j, fgcolor);
+			else drawPixel(x + i, y + j, bgcolor);
+		}
+	}
+}
+
+/***************************************************************************************
+** Function name:           drawXBitmap
+** Description:             Draw an image stored in an XBM array onto the TFT
+***************************************************************************************/
+void TFTLIB_8BIT::drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color)
+{
+	int32_t i, j, byteWidth = (w + 7) / 8;
+
+	for (j = 0; j < h; j++) {
+		for (i = 0; i < w; i++ ) {
+			if (read_byte(bitmap + j * byteWidth + i / 8) & (1 << (i & 7))) {
+				drawPixel(x + i, y + j, color);
+			}
+		}
+	}
+}
+
+
+/***************************************************************************************
+** Function name:           drawXBitmap
+** Description:             Draw an XBM image with foreground and background colors
+***************************************************************************************/
+void TFTLIB_8BIT::drawXBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color, uint16_t bgcolor)
+{
+	int32_t i, j, byteWidth = (w + 7) / 8;
+
+	for (j = 0; j < h; j++) {
+		for (i = 0; i < w; i++ ) {
+			if (read_byte(bitmap + j * byteWidth + i / 8) & (1 << (i & 7)))
+				drawPixel(x + i, y + j,   color);
 			else drawPixel(x + i, y + j, bgcolor);
 		}
 	}
@@ -1846,6 +2055,15 @@ int16_t TFTLIB_8BIT::textWidth(const char *string, uint8_t font) {
 }
 
 /***************************************************************************************
+** Function name:           getCursor
+** Description:             Get the text cursor x & y position
+***************************************************************************************/
+void TFTLIB_8BIT::getCursor(int16_t* x, int16_t* y) {
+	 *x = cursor_x;
+	 *y = cursor_y;
+}
+
+/***************************************************************************************
 ** Function name:           setCursor
 ** Description:             Set the text cursor x,y position
 ***************************************************************************************/
@@ -1897,6 +2115,14 @@ void TFTLIB_8BIT::setTextColor(uint16_t c) {
 	textcolor = textbgcolor = c;
 }
 
+/***************************************************************************************
+** Function name:           setTextWrap
+** Description:             Define if text should wrap at end of line
+***************************************************************************************/
+void TFTLIB_8BIT::setTextWrap(bool wrapX, bool wrapY) {
+	textwrapX = wrapX;
+	textwrapY = wrapY;
+}
 
 /***************************************************************************************
 ** Function name:           setTextColor
