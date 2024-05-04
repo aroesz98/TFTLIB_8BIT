@@ -2,7 +2,7 @@
  * ili9327_drv.h
  *
  *  Created on: Mar 2, 2022
- *      Author: asz
+ *      Author: Arkadiusz Szlanta
  */
 
 #ifndef INC_ILI9327_DRV_H_

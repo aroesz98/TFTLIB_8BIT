@@ -1,13 +1,13 @@
 /*
- * TFTLIB_8BIT.h
+ * TFTLIB_8BIT.hpp
  *
  *  Created on: Jan 10, 2022
  *  Updated on: Feb 20, 2022
- *      Author: asz
+ *      Author: Arkadiusz Szlanta
  */
 
-#ifndef INC_TFTLIB_8BIT_H_
-#define INC_TFTLIB_8BIT_H_
+#ifndef TFTLIB_8BIT_HPP
+#define TFTLIB_8BIT_HPP
 
 #pragma GCC push_options
 #pragma GCC optimize ("Ofast")
@@ -19,76 +19,8 @@
 #include <string.h>
 #include <math.h>
 
-#include <Print.h>
+#include <Print.hpp>
 #include "GFXFF/gfxfont.h"
-
-enum COLORS{
-	WHITE		= 0xFFFF,
-	BLACK		= 0x0000,
-	GRAY		= 0X8430,
-	LIGHTGREY	= 0xD69A,
-	DARKGREY	= 0x7BEF,
-	RED			= 0xF800,
-	GREEN		= 0x07E0,
-	DARKGREEN	= 0x03E0,
-	BLUE		= 0x001F,
-	LIGHTBLUE	= 0X7D7C,
-	DARKBLUE	= 0X01CF,
-	SKYBLUE		= 0x867D,
-	YELLOW		= 0xFFE0,
-	PURPLE		= 0x780F,
-	MAGENTA		= 0xF81F,
-	VIOLET		= 0x915C,
-	CYAN		= 0x7FFF,
-	DARKCYAN	= 0x03EF,
-	ORANGE		= 0xFB20,
-	PINK		= 0xFE19,
-	BROWN		= 0x9A60,
-	GOLD		= 0xFEA0,
-	SILVER		= 0xC618,
-	BRED		= 0XF81F,
-	GRED		= 0XFFE0,
-	GBLUE		= 0X07FF,
-	BRRED		= 0XFC07,
-	GRAYBLUE	= 0X5458,
-	LGRAY		= 0XC618,
-	LGRAYBLUE	= 0XA651,
-	LBBLUE		= 0X2B12,
-	NAVY		= 0x000F,
-	MAROON		= 0x7800,
-	OLIVE		= 0x7BE0,
-	GREENYELLOW	= 0xB7E0,
-
-	DKBLUE		= 0x000D,
-	DKTEAL		= 0x020C,
-	DKGREEN		= 0x03E0,
-	DKCYAN		= 0x03EF,
-	DKRED		= 0x6000,
-	DKMAGENTA	= 0x8008,
-	DKYELLOW	= 0x8400,
-	DKORANGE 	= 0x8200,
-	DKPINK		= 0x9009,
-	DKPURPLE	= 0x4010,
-	DKGREY		= 0x4A49,
-};
-
-enum DATUM {
-	TL_DATUM = 0, // Top left (default)
-	TC_DATUM = 1, // Top centre
-	TR_DATUM = 2, // Top right
-	ML_DATUM = 3, // Middle left
-	CL_DATUM = 3, // Centre left, same as above
-	MC_DATUM = 4, // Middle centre
-	CC_DATUM = 4, // Centre centre, same as above
-	MR_DATUM = 5, // Middle right
-	CR_DATUM = 5, // Centre right, same as above
-	BL_DATUM = 6, // Bottom left
-	BC_DATUM = 7, // Bottom centre
-	BR_DATUM = 8, // Bottom right
-	L_BASELINE = 9, // Left character baseline (Line the 'A' character would sit on)
-	C_BASELINE = 10, // Centre character baseline
-	R_BASELINE = 11, // Right character baseline
-};
 
 /* Control Registers and constant codes */
 #define SWRESET			0x01
@@ -111,10 +43,6 @@ enum DATUM {
 #define VMCTR1			0xC5
 #define VMCTR2			0xC7
 
-#define COLMOD			0x3A
-#define COLOR_MODE_16bit 0x55
-#define COLOR_MODE_18bit 0x66
-
 #define MADCTL			0x36
 #define MADCTL_MH		0x04
 #define MADCTL_ML		0x10
@@ -123,6 +51,10 @@ enum DATUM {
 #define MADCTL_MY		0x80
 #define MADCTL_RGB		0x00
 #define MADCTL_BGR		0x08
+
+#define COLMOD           0x3A
+#define COLOR_MODE_16bit 0x55
+#define COLOR_MODE_18bit 0x66
 
 #define Byte8H(ByteH) ((uint8_t)(((uint16_t)(ByteH)&0xFF00)>>8))
 #define Byte8L(ByteL) ((uint8_t)( (uint16_t)(ByteL)&0x00FF))
@@ -137,21 +69,20 @@ constexpr float PixelAlphaGain   = 255.0;
 constexpr float LoAlphaTheshold  = 64.0/255.0;
 constexpr float HiAlphaTheshold  = 1.0 - LoAlphaTheshold;
 
-inline GFXglyph *pgm_read_glyph_ptr(const GFXfont *gfxFont, uint8_t c) {
+inline GFXglyph *pgm_read_glyph_ptr(const GFXfont *gfxFont, uint8_t c)
+{
 	return gfxFont->glyph + c;
 }
 
-inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
+inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont)
+{
 	return gfxFont->bitmap;
 }
 
-enum LCD_DRIVER {
-	ILI9341_PARALLEL	= 0x01,
-	ILI9327_PARALLEL	= 0x02,
-	NT35510_PARALLEL	= 0x04,
-};
+class TFTLIB_8BIT : public Print
+{
+	friend class TFT_eSprite;
 
-class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 	private:
 		uint8_t _rotation;
 		int32_t _tx0, _tx1, _ty0, _ty1;
@@ -171,22 +102,22 @@ class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 		uint16_t _text_fg = RED, _text_bg = BLACK;
 		uint16_t SWAP_UINT16(uint16_t x) {x = (x >> 8) | (x << 8); return x;}
 
-		uint8_t  decoderState = 0;   // UTF8 decoder state        - not for user access
-		uint16_t decoderBuffer;      // Unicode code-point buffer - not for user access
+		uint8_t  decoderState = 0;						// UTF8 decoder state        - not for user access
+		uint16_t decoderBuffer;							// Unicode code-point buffer - not for user access
 
-		uint8_t glyph_ab,   // Smooth font glyph delta Y (height) above baseline
-				glyph_bb;   // Smooth font glyph delta Y (height) below baseline
+		uint8_t glyph_ab,								// Smooth font glyph delta Y (height) above baseline
+				glyph_bb;								// Smooth font glyph delta Y (height) below baseline
 
 		bool     _utf8;
-		bool     isDigits;   // adjust bounding box for numbers to reduce visual jiggling
-		bool     textwrapX, textwrapY;  // If set, 'wrap' text at right and optionally bottom edge of display
+		bool     isDigits;								// adjust bounding box for numbers to reduce visual jiggling
+		bool     textwrapX, textwrapY;					// If set, 'wrap' text at right and optionally bottom edge of display
 
-		int32_t  cursor_x = 0, cursor_y = 0, padX = 0;       // Text cursor x,y and padding setting
-		uint32_t textcolor, textbgcolor;         // Text foreground and background colours
+		int32_t  cursor_x = 0, cursor_y = 0, padX = 0;  // Text cursor x,y and padding setting
+		uint32_t textcolor, textbgcolor;				// Text foreground and background colours
 
-		uint8_t	textfont  = 1,  // Current selected font number
-				textsize  = 1,  // Current font size multiplier
-				textdatum = TL_DATUM; // Text reference datum
+		uint8_t	textfont  = 1,							// Current selected font number
+				textsize  = 1,							// Current font size multiplier
+				textdatum = TL_DATUM;					// Text reference datum
 
 		int32_t _display_width  = 480;
 		int32_t _display_height = 800;
@@ -217,6 +148,83 @@ class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 		void RD_IDLE(void)	 { RD_H(); asm("NOP"); }
 
 	public:
+		enum LCD_DRIVER
+		{
+			ILI9341_PARALLEL	= 0x01,
+			ILI9327_PARALLEL	= 0x02,
+			NT35510_PARALLEL	= 0x04,
+		};
+
+		enum DATUM
+		{
+			TL_DATUM = 0, // Top left (default)
+			TC_DATUM = 1, // Top centre
+			TR_DATUM = 2, // Top right
+			ML_DATUM = 3, // Middle left
+			CL_DATUM = 3, // Centre left, same as above
+			MC_DATUM = 4, // Middle centre
+			CC_DATUM = 4, // Centre centre, same as above
+			MR_DATUM = 5, // Middle right
+			CR_DATUM = 5, // Centre right, same as above
+			BL_DATUM = 6, // Bottom left
+			BC_DATUM = 7, // Bottom centre
+			BR_DATUM = 8, // Bottom right
+			L_BASELINE = 9, // Left character baseline (Line the 'A' character would sit on)
+			C_BASELINE = 10, // Centre character baseline
+			R_BASELINE = 11, // Right character baseline
+		};
+
+		enum COLORS
+		{
+			WHITE		= 0xFFFF,
+			BLACK		= 0x0000,
+			GRAY		= 0X8430,
+			LIGHTGREY	= 0xD69A,
+			DARKGREY	= 0x7BEF,
+			RED			= 0xF800,
+			GREEN		= 0x07E0,
+			DARKGREEN	= 0x03E0,
+			BLUE		= 0x001F,
+			LIGHTBLUE	= 0X7D7C,
+			DARKBLUE	= 0X01CF,
+			SKYBLUE		= 0x867D,
+			YELLOW		= 0xFFE0,
+			PURPLE		= 0x780F,
+			MAGENTA		= 0xF81F,
+			VIOLET		= 0x915C,
+			CYAN		= 0x7FFF,
+			DARKCYAN	= 0x03EF,
+			ORANGE		= 0xFB20,
+			PINK		= 0xFE19,
+			BROWN		= 0x9A60,
+			GOLD		= 0xFEA0,
+			SILVER		= 0xC618,
+			BRED		= 0XF81F,
+			GRED		= 0XFFE0,
+			GBLUE		= 0X07FF,
+			BRRED		= 0XFC07,
+			GRAYBLUE	= 0X5458,
+			LGRAY		= 0XC618,
+			LGRAYBLUE	= 0XA651,
+			LBBLUE		= 0X2B12,
+			NAVY		= 0x000F,
+			MAROON		= 0x7800,
+			OLIVE		= 0x7BE0,
+			GREENYELLOW	= 0xB7E0,
+
+			DKBLUE		= 0x000D,
+			DKTEAL		= 0x020C,
+			DKGREEN		= 0x03E0,
+			DKCYAN		= 0x03EF,
+			DKRED		= 0x6000,
+			DKMAGENTA	= 0x8008,
+			DKYELLOW	= 0x8400,
+			DKORANGE 	= 0x8200,
+			DKPINK		= 0x9009,
+			DKPURPLE	= 0x4010,
+			DKGREY		= 0x4A49,
+		};
+
 		TFTLIB_8BIT(GPIO_TypeDef *parallel_bus, uint8_t drv, GPIO_TypeDef *GPIO_RD_PORT, uint16_t GPIO_RD_PIN, GPIO_TypeDef *GPIO_WR_PORT, uint16_t GPIO_WR_PIN, GPIO_TypeDef *GPIO_DC_PORT, uint16_t GPIO_DC_PIN, GPIO_TypeDef *GPIO_CS_PORT, uint16_t GPIO_CS_PIN);
 		~TFTLIB_8BIT();
 
@@ -291,7 +299,7 @@ class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 		void setTextColor(uint16_t c, uint16_t b);
 		void setTextWrap(bool wrapX, bool wrapY = false);
 		void setTextSize(uint8_t s);
-		void setFreeFont(const GFXfont *f);
+		void setFreeFont(const GFXfont &f);
 		void setTextDatum(uint8_t d);
 		void setTextPadding(uint16_t x_width);
 
@@ -349,12 +357,12 @@ class TFTLIB_8BIT : public Print { friend class TFT_eSprite;
 		uint32_t testFilledTriangles();
 		uint32_t testRoundRects();
 		uint32_t testFilledRoundRects();
+
 		void benchmark(void);
 		void cpuConfig(void);
 		int FreeRAM();
 };
 
-#endif
 #pragma GCC pop_options
+#endif // TFTLIB_8BIT_HPP
 
-//#endif

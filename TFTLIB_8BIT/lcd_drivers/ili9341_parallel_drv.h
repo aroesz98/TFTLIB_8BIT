@@ -3,7 +3,7 @@
  *
  *  Created on: Feb 17, 2022
  *  Updated on: Feb 20, 2022
- *      Author: asz
+ *      Author: Arkadiusz Szlanta
  */
 
 {

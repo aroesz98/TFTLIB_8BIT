@@ -1,5 +1,5 @@
-#ifndef String_class_h
-#define String_class_h
+#ifndef STRING_HPP
+#define STRING_HPP
 #ifdef __cplusplus
 
 #include <stdlib.h>
@@ -22,10 +22,9 @@ class String {
 		String(const char *cstr = "");
 		String(const String &str);
 		String(const __FlashStringHelper *str);
-		   #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
 		String(String &&rval);
 		String(StringSumHelper &&rval);
-		#endif
+
 		explicit String(char c);
 		explicit String(unsigned char, unsigned char base=10);
 		explicit String(int, unsigned char base=10);
@@ -171,4 +170,4 @@ class StringSumHelper : public String {
 };
 
 #endif  // __cplusplus
-#endif  // String_class_h
+#endif  // STRING_HPP

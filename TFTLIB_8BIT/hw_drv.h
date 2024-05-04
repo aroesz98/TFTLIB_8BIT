@@ -3,7 +3,7 @@
  *
  *  Created on: Jan 10, 2022
  *  Updated on: Feb 20, 2022
- *      Author: asz
+ *      Author: Arkadiusz Szlanta
  */
 
 void PIN_INPUT (GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
